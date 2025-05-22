@@ -15,6 +15,34 @@ header {
   text-align: center;
 }
 
+.actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  align-items: center;
+  margin-top: 1rem;
+  flex-direction: row;
+  height: auto !important;
+}
+
+.actions button {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  border-radius: 10px;
+  background: #007bff;
+  color: white;
+  border: none;
+  cursor: pointer;
+  min-width: 120px;
+  min-height: 44px;
+  transition: background 0.2s;
+}
+
+.actions button:hover {
+  background: #0056b3;
+}
+
+
 /* toolbar */
 .toolbar {
   display: flex;
