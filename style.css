@@ -1,0 +1,73 @@
+/* reset */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: Arial, sans-serif;
+  background: #f7f7f7;
+  color: #333;
+}
+
+/* header */
+header {
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  padding: 1rem;
+  text-align: center;
+}
+
+/* toolbar */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  padding: 0.75rem;
+}
+
+.file-input input[type="file"] { display: none; }
+.file-input span {
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  background: #e0e0e0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  user-select: none;
+}
+
+button {
+  padding: 0.5rem 1rem;
+  border: none;
+  background: #007bff;
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+button:hover { background: #0056b3; }
+button.active { background: #0056b3; }
+
+.current-mode {
+  margin-left: auto;
+  font-size: 0.9rem;
+}
+
+/* canvas container */
+.canvas-container {
+  display: flex;
+  justify-content: center;
+  padding: 1rem;
+  overflow: auto;
+  /* cap height so very tall images scroll */
+  max-height: calc(100vh - 140px);
+}
+
+#canvas {
+  border: 3px solid #ccc;
+  background: #fff;
+  /* we will set its CSS width/height in JS to enforce a max display size */
+  display: block;
+
+}

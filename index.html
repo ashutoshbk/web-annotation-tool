@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Annotation Tool</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Simple Annotation Tool</h1>
+  </header>
+
+  <div class="toolbar">
+    <label class="file-input">
+      <input type="file" id="imageLoader" accept="image/*">
+      <span>Choose Image</span>
+    </label>
+    <button id="boxBtn" class="active">Draw Box</button>
+    <button id="polyBtn">Draw Polygon</button>
+    <button id="exportBtn">Export JSON</button>
+    <div class="current-mode">
+      Mode: <strong id="currentMode">Box</strong>
+    </div>
+  </div>
+
+  <div class="canvas-container">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
