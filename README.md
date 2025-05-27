@@ -1,12 +1,14 @@
 # Simple Web Image Annotation Tool
 
 A browser-based tool for annotating images with bounding boxes and polygons, inspired by [LabelMe](http://labelme.csail.mit.edu/).  
-Supports polygon and bounding box annotation, editing, deleting, and JSON export.
+Supports polygon and bounding box annotation, editing, deleting, **move, resize**, and JSON export.
 
 ## Features
 
 - Draw bounding boxes (rectangles) and polygons on any uploaded image
 - Assign custom text labels to each annotation
+- **Move and resize boxes** (drag corners or shape body)
+- **Move polygons by dragging inside; drag any vertex to reshape**
 - Select, edit, and delete annotations using on-screen buttons
 
 ## Usage
@@ -17,9 +19,12 @@ Supports polygon and bounding box annotation, editing, deleting, and JSON export
    - *Box*: Click two corners
    - *Polygon*: Click for each point, double-click to finish
 4. **Label**: Enter label for each shape as prompted
-5. **Edit or Delete**:  
+5. **Edit, Move, Resize, or Delete**:
    - Right-click on a shape to select (yellow highlight)
    - Use “Edit Label” or “Delete” buttons below the canvas
+   - **Drag inside a selected shape to move it**
+   - **Drag a box corner to resize it**
+   - **Drag a polygon vertex (orange circle) to reshape**
 6. **Export**:  
    - Click “Export JSON”
    - Choose location (can overwrite existing JSON in modern browsers)

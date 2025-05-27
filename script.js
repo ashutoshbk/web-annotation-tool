@@ -17,7 +17,17 @@ let currentMouse  = null;    // used for live preview
 let maxDisplayWidth = 800;   // maximum CSS display width in pixels
 let selectedIdx = null;      // index of selected shape (null if none)
 
-// --- Helpers for coordinate mapping ---
+// --- Drag/move/resize state ---
+let isDragging = false;
+let dragOffset = { x: 0, y: 0 };
+let dragType = null; // "box", "polygon", "handle", "polyvertex"
+let dragPolyStart = null; // starting polygon for move
+let resizeHandleIdx = null;
+let resizePolyVertex = null;
+
+const HANDLE_SIZE = 18;
+
+// --- Helpers ---
 function getMousePos(e) {
   const rect = canvas.getBoundingClientRect();
   const scaleX = canvas.width  / rect.width;
@@ -28,7 +38,26 @@ function getMousePos(e) {
   };
 }
 
-// --- Load image, record its filename, and fit display size ---
+function getBoxHandles(box) {
+  // returns 4 corners: tl, tr, br, bl
+  return [
+    { x: box.x, y: box.y },
+    { x: box.x + box.width, y: box.y },
+    { x: box.x + box.width, y: box.y + box.height },
+    { x: box.x, y: box.y + box.height }
+  ];
+}
+
+function handleHitTest(pt, handles) {
+  for (let i = 0; i < handles.length; ++i) {
+    if (Math.abs(pt.x - handles[i].x) <= HANDLE_SIZE/2 && Math.abs(pt.y - handles[i].y) <= HANDLE_SIZE/2) {
+      return i;
+    }
+  }
+  return null;
+}
+
+// --- Load image ---
 document.getElementById('imageLoader').addEventListener('change', handleImage);
 
 function handleImage(e) {
@@ -53,13 +82,59 @@ function handleImage(e) {
   reader.readAsDataURL(file);
 }
 
-// --- Drawing logic ---
+// --- mousedown ---
 canvas.addEventListener('mousedown', e => {
-  // Prevent adding points if selecting a shape
+  // --- Box resize handle ---
+  if (selectedIdx !== null && annotations[selectedIdx].type === 'box') {
+    const box = annotations[selectedIdx];
+    const { x, y } = getMousePos(e);
+    const handles = getBoxHandles(box);
+    let hIdx = handleHitTest({x, y}, handles);
+    if (hIdx !== null) {
+      isDragging = true;
+      dragType = "handle";
+      resizeHandleIdx = hIdx;
+      dragOffset.x = x - handles[hIdx].x;
+      dragOffset.y = y - handles[hIdx].y;
+      return;
+    }
+    // MOVE BOX
+    if (
+      x >= box.x && x <= box.x + box.width &&
+      y >= box.y && y <= box.y + box.height
+    ) {
+      isDragging = true;
+      dragType = "box";
+      dragOffset.x = x - box.x;
+      dragOffset.y = y - box.y;
+      return;
+    }
+  }
+  // --- Polygon vertex resize ---
+  if (selectedIdx !== null && annotations[selectedIdx].type === 'polygon') {
+    const poly = annotations[selectedIdx];
+    const { x, y } = getMousePos(e);
+    for (let i = 0; i < poly.points.length; ++i) {
+      if (Math.abs(x - poly.points[i].x) <= HANDLE_SIZE/2 && Math.abs(y - poly.points[i].y) <= HANDLE_SIZE/2) {
+        isDragging = true;
+        dragType = "polyvertex";
+        resizePolyVertex = i;
+        return;
+      }
+    }
+    // MOVE POLYGON
+    if (pointInPolygon({x, y}, poly.points)) {
+      isDragging = true;
+      dragType = "polygon";
+      dragOffset.x = x;
+      dragOffset.y = y;
+      dragPolyStart = poly.points.map(pt => ({ x: pt.x, y: pt.y }));
+      return;
+    }
+  }
   if (selectedIdx !== null) return;
   currentMouse = null;
   const { x, y } = getMousePos(e);
-
   if (mode === 'box') {
     if (!boxStart) {
       boxStart = { x, y };
@@ -75,6 +150,67 @@ canvas.addEventListener('mousedown', e => {
   }
 });
 
+// --- mousemove ---
+canvas.addEventListener('mousemove', function(e) {
+  // --- Resize box handle ---
+  if (isDragging && dragType === "handle" && selectedIdx !== null && annotations[selectedIdx].type === 'box') {
+    const { x, y } = getMousePos(e);
+    const box = annotations[selectedIdx];
+    let handles = getBoxHandles(box);
+    let idx = resizeHandleIdx;
+    // diagonal opposite corner
+    let ox = handles[(idx+2)%4].x, oy = handles[(idx+2)%4].y;
+    box.x = Math.min(x-dragOffset.x, ox);
+    box.y = Math.min(y-dragOffset.y, oy);
+    box.width = Math.abs((x-dragOffset.x) - ox);
+    box.height = Math.abs((y-dragOffset.y) - oy);
+    draw();
+    return;
+  }
+  // --- Polygon vertex drag ---
+  if (isDragging && dragType === "polyvertex" && selectedIdx !== null && annotations[selectedIdx].type === 'polygon') {
+    const { x, y } = getMousePos(e);
+    let poly = annotations[selectedIdx];
+    let idx = resizePolyVertex;
+    poly.points[idx].x = x;
+    poly.points[idx].y = y;
+    draw();
+    return;
+  }
+  // --- Drag BOX ---
+  if (isDragging && dragType === "box" && selectedIdx !== null && annotations[selectedIdx].type === 'box') {
+    const { x, y } = getMousePos(e);
+    const box = annotations[selectedIdx];
+    box.x = x - dragOffset.x;
+    box.y = y - dragOffset.y;
+    draw();
+    return;
+  }
+  // --- Drag POLYGON ---
+  if (isDragging && dragType === "polygon" && selectedIdx !== null && annotations[selectedIdx].type === 'polygon') {
+    const { x, y } = getMousePos(e);
+    const poly = annotations[selectedIdx];
+    const dx = x - dragOffset.x;
+    const dy = y - dragOffset.y;
+    poly.points.forEach((pt, i) => {
+      pt.x = dragPolyStart[i].x + dx;
+      pt.y = dragPolyStart[i].y + dy;
+    });
+    draw();
+    return;
+  }
+  const { x, y } = getMousePos(e);
+  if (mode === 'box' && boxStart) { currentMouse = { x, y }; draw(); }
+  if (mode === 'polygon' && polygonPoints.length > 0) { currentMouse = { x, y }; draw(); }
+});
+
+canvas.addEventListener('mouseup', function(e) {
+  isDragging = false;
+  dragType = null;
+  dragPolyStart = null;
+  resizeHandleIdx = null;
+  resizePolyVertex = null;
+});
 
 // --- Point-in-polygon helper ---
 function pointInPolygon(pt, verts) {
@@ -89,12 +225,6 @@ function pointInPolygon(pt, verts) {
   return inside;
 }
 
-canvas.addEventListener('mousemove', e => {
-  const { x, y } = getMousePos(e);
-  if (mode === 'box' && boxStart) { currentMouse = { x, y }; draw(); }
-  if (mode === 'polygon' && polygonPoints.length > 0) { currentMouse = { x, y }; draw(); }
-});
-
 canvas.addEventListener('dblclick', () => {
   if (mode === 'polygon' && polygonPoints.length >= 3) {
     const label = prompt("Enter label for this polygon:");
@@ -106,49 +236,23 @@ canvas.addEventListener('dblclick', () => {
 canvas.addEventListener('contextmenu', e => {
   e.preventDefault();
   const { x, y } = getMousePos(e);
-
-  annotations.forEach((a, i) => {
-    if (a.type === 'box') {
-      console.log(`Testing box #${i}: x=${a.x}, y=${a.y}, w=${a.width}, h=${a.height}`);
-    } else if (a.type === 'polygon') {
-      console.log(`Testing polygon #${i}: points=`, a.points);
-    }
-  });
-
   if (boxStart || polygonPoints.length > 0) {
-  // Cancel drawing mode, then continue to shape selection below!
-  boxStart = null;
-  polygonPoints = [];
-  currentMouse = null;
-  draw();
-  // DO NOT return! Let the code continue to shape detection
+    boxStart = null;
+    polygonPoints = [];
+    currentMouse = null;
+    draw();
   }
-
-
   let found = false;
   for (let i = 0; i < annotations.length; i++) {
     const a = annotations[i];
     if (a.type === 'box') {
-      // Debug logs for math
-      console.log('x:', x, 'a.x:', a.x, 'a.x+a.width:', a.x + a.width);
-      console.log('y:', y, 'a.y:', a.y, 'a.y+a.height:', a.y + a.height);
-      console.log(
-        'Test: (x >= a.x)', x >= a.x,
-        '&& (x <= a.x + a.width)', x <= a.x + a.width,
-        '&& (y >= a.y)', y >= a.y,
-        '&& (y <= a.y + a.height)', y <= a.y + a.height
-      );
       if (x >= a.x && x <= a.x + a.width && y >= a.y && y <= a.y + a.height) {
-        console.log('Box hit! Index:', i);
         selectedIdx = i;
         found = true;
         break;
       }
     } else if (a.type === 'polygon') {
-      // Polygon math and debug logs
-      console.log('Testing polygon:', a.points);
       if (pointInPolygon({x, y}, a.points)) {
-        console.log('Polygon hit! Index:', i);
         selectedIdx = i;
         found = true;
         break;
@@ -164,17 +268,24 @@ canvas.addEventListener('contextmenu', e => {
   draw();
 });
 
+function drawHandle(x, y) {
+  ctx.save();
+  ctx.fillStyle = '#fff';
+  ctx.strokeStyle = '#ff9900';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(x, y, HANDLE_SIZE/2, 0, 2 * Math.PI);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
 
-
-
-// central drawing function
+// --- Central drawing function ---
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (image.src) ctx.drawImage(image, 0, 0);
-
   ctx.font = `${labelFontSize}px Arial`;
   ctx.fillStyle = 'black';
-
   annotations.forEach((a, i) => {
     if (i === selectedIdx) {
       ctx.save();
@@ -190,14 +301,22 @@ function draw() {
     if (a.type === 'box') {
       ctx.strokeRect(a.x, a.y, a.width, a.height);
       ctx.fillText(a.label, a.x + 4, a.y - 6);
+      // Draw resize handles if selected
+      if (i === selectedIdx) {
+        let handles = getBoxHandles(a);
+        handles.forEach(h => drawHandle(h.x, h.y));
+      }
     } else {
       ctx.beginPath(); ctx.moveTo(a.points[0].x, a.points[0].y);
       a.points.forEach(p => ctx.lineTo(p.x, p.y)); ctx.closePath(); ctx.stroke();
       ctx.fillText(a.label, a.points[0].x + 4, a.points[0].y - 6);
+      // Draw vertex handles if selected
+      if (i === selectedIdx) {
+        a.points.forEach(p => drawHandle(p.x, p.y));
+      }
     }
     if (i === selectedIdx) ctx.restore();
   });
-
   // preview polygon
   if (mode === 'polygon' && polygonPoints.length > 0) {
     ctx.strokeStyle = 'blue'; ctx.lineWidth = strokeWidth;
@@ -206,7 +325,6 @@ function draw() {
     if (currentMouse) ctx.lineTo(currentMouse.x, currentMouse.y);
     ctx.stroke();
   }
-
   // preview box
   if (mode === 'box' && boxStart && currentMouse) {
     const x0 = boxStart.x, y0 = boxStart.y, x1 = currentMouse.x, y1 = currentMouse.y;
@@ -256,7 +374,6 @@ async function exportAnnotations() {
       accept: { 'application/json': ['.json'] }
     }]
   };
-
   try {
     // Open the save file picker dialog
     const handle = await window.showSaveFilePicker(options);
